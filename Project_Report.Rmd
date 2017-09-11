@@ -17,6 +17,24 @@ This project is to perform an analysis of the statistical analyses in all publis
 * How do they vary by field? 
 * Are there any trends over the last 10-15 years?
 
+**Project Step 1**
+
+Data: the dataset for this project should include all the published [PLoS](https://www.plos.org) papers from its 7 journals, [PLoS one](http://journals.plos.org/plosone/), [PLoS Biology](http://journals.plos.org/plosbiology/), [PLoS Medicine](http://journals.plos.org/plosmedicine/), [PLoS Comutational Biology](http://journals.plos.org/ploscompbiol/), [PLoS Genetic](http://journals.plos.org/plosgenetics/), [PLoS Neglected Tropical Diseases](http://journals.plos.org/plosntds/) and [PLos Pathogens](http://journals.plos.org/plospathogens/). For each publication, there'are a list of information we need to download from the websites into our R program as the dataset:
+
+* Text of the article (including figure legends)
+* Article title
+* Authors
+* PLoS journal
+* Date of publication
+
+**Project Step 2**
+
+Usually the statistical analysis techique utilized in a publication is described in the *Materials and Methods* section of the article,thus we should focus on 
+
+
+
+**Project Step 3**
+
 
 
 ```{r }
