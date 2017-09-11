@@ -1,0 +1,25 @@
+---
+title: "Project Report"
+author: "Ye Zhang"
+date: "9/11/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Outline
+
+This project is to perform an analysis of the statistical analyses in all published [PLoS](https://www.plos.org) papers, so as to answer quenstions as below:
+
+* What are the most common techniques? 
+* How do they vary by field? 
+* Are there any trends over the last 10-15 years?
+
+
+
+```{r }
+
+```
+
