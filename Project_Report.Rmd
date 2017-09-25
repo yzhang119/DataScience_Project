@@ -37,7 +37,7 @@ Types of analyses: Usually the statistical analysis techique utilized in a publi
 Dataset Analysis: After extracting all the key words from articles, we can then start to answer the three questions listed at the beginning. With the dataset established through **Step 1** and **2**, it's possible to figure out the most commonly utilized analyses techniques, and coorelation between these techniques and the fields (the PLoS journal) and publication years. Take the key word "t test" as an example, we can figure out how many times the "t test" is mentioned over the years as well as in articles among 7 different fields.
 
 ```{r echo=FALSE, results='hide'}
-install.packages("tm")
+install.packages("tm", repos="http://cran.rstudio.com/")
 library("tm")
 
 if (!require("rplos")) {
@@ -52,7 +52,7 @@ devtools::install_github("ropensci/rplos")
 library("rplos")
 }
 
-install.packages("fulltext")
+install.packages("fulltext",repos="http://cran.rstudio.com/")
 library("fulltext")
 
 library("XML")
@@ -62,6 +62,8 @@ library("XML")
 Search a list of articles with the key words "statistical"
 
 ```{r }
+out_id <- searchplos(q="materials_and_methods: statistics",
+                     fl="id", fq='doc_type: full', sort='publication_date desc')
 out_fulltext <- plos_fulltext(doi=out_id$data$id[1])
 data <- xmlParse(out_fulltext$`10.1371/journal.ppat.1006607`)
 out_abstract <- xpathSApply(data, "//abstract", xmlValue)
@@ -70,16 +72,42 @@ text <- ft_get(out_id$data$id[1])
 text$plos$data
 ```
 
-## Analysis
 Create a dictionary for common statistical methods and select paper with key words in "material and methods" part
 ```{r}
 pool <- c("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
           "neural network", "support vector machine", "ridge regression")
+out_LR <- searchplos(q="materials_and_methods: linear regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_Boot <- searchplos(q="materials_and_methods: bootstrap",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_MaxL <- searchplos(q="materials_and_methods: maximum likelihood",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_ANOVA <- searchplos(q="materials_and_methods: ANOVA",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_Cluster <- searchplos(q="materials_and_methods: clustering",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_NN <- searchplos(q="materials_and_methods: neural network",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_SVM <- searchplos(q="materials_and_methods: support vector machine",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+out_RR <- searchplos(q="materials_and_methods: ridge regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+```
+
+## Analysis
+```{r}
+
+plosword(list('linear regression', 'bootstrap','ANOVA'), vis = TRUE)
+
+plot_throughtime(terms = c('linear regression','bootstrap','ANOVA'), limit = 100)
 
 output <- highplos(q='linear regression', hl.fl = 'Materials and Methods')
-
-plosword(list('linear regression', 'bootstrap'), vis = TRUE)
-
-plot_throughtime(terms = c('linear regression','bootstrap'), limit = 100)
-
 ```
