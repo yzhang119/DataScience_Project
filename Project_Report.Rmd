@@ -62,11 +62,24 @@ library("XML")
 Search a list of articles with the key words "statistical"
 
 ```{r }
-out_id <- searchplos(q='statistical', fl="id", fq='doc_type:full', limit=100)
-out_fulltext <- plos_fulltext(doi=out_id$data$id[10])
-xpathSApply(xmlParse(out_fulltext$`10.1371/journal.pcbi.1001057`), "//abstract", xmlValue)
+out_fulltext <- plos_fulltext(doi=out_id$data$id[1])
+data <- xmlParse(out_fulltext$`10.1371/journal.ppat.1006607`)
+out_abstract <- xpathSApply(data, "//abstract", xmlValue)
 
 text <- ft_get(out_id$data$id[1])
 text$plos$data
 ```
 
+## Analysis
+Create a dictionary for common statistical methods and select paper with key words in "material and methods" part
+```{r}
+pool <- c("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
+          "neural network", "support vector machine", "ridge regression")
+
+output <- highplos(q='linear regression', hl.fl = 'Materials and Methods')
+
+plosword(list('linear regression', 'bootstrap'), vis = TRUE)
+
+plot_throughtime(terms = c('linear regression','bootstrap'), limit = 100)
+
+```
