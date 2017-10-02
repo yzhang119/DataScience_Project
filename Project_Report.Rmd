@@ -133,7 +133,18 @@ After downloading the "abstract"" and "materials and methods" from articles we a
 ```{r}
 install.package("tidytext")
 library(tidytext)
+library(dplyr)
+library(tidyr)
+library(stringr)
 
+tidy_abstract <- out_abstract %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+  
+file_words <- tidy_abstract %>%
+  unnest_tokens(word, x) %>%
+  anti_join(stop_words) %>%
+  group_by(word) %>%
+  tally() %>%
+  arrange(desc(n))
 ```
 
 
