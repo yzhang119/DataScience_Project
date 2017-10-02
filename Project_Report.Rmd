@@ -1,17 +1,19 @@
 ---
 title: "Project Report"
 author: "Ye Zhang"
-date: "9/17/2017"
-output: html_document
+date: "10/01/2017"
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Project Outline
+## Introduction
 
-This project is to perform an analysis of the statistical analyses in all published [PLoS](https://www.plos.org) papers, so as to answer quenstions as below:
+The Public Library of Science (PLoS) is a nonprofit open access science, technology and medicine publisher, innovator and advocacy organization with a library of open access journals and other scientific literature under an open content license. This project is to perform an analysis of the statistical analyses in all published [PLoS](https://www.plos.org) papers, so as to answer quenstions as below:
 
 * What are the most common techniques? 
 * How do they vary by field? 
@@ -21,11 +23,12 @@ This project is to perform an analysis of the statistical analyses in all publis
 
 Data: the dataset for this project should include all the published [PLoS](https://www.plos.org) papers from its 7 journals, [PLoS one](http://journals.plos.org/plosone/), [PLoS Biology](http://journals.plos.org/plosbiology/), [PLoS Medicine](http://journals.plos.org/plosmedicine/), [PLoS Comutational Biology](http://journals.plos.org/ploscompbiol/), [PLoS Genetic](http://journals.plos.org/plosgenetics/), [PLoS Neglected Tropical Diseases](http://journals.plos.org/plosntds/) and [PLos Pathogens](http://journals.plos.org/plospathogens/). For each publication, there'are a list of information we need to download from the websites into our R program as the dataset:
 
-* Text of the article (including figure legends)
 * Article title
 * Authors
+* Article DOI
 * PLoS journal
 * Date of publication
+* Materials and Methods part
 
 **Step 2**
 
@@ -58,24 +61,40 @@ library("fulltext")
 library("XML")
 ```
 
-## Getting data
-Search a list of articles with the key words "statistical"
+## Data Preparation
+
+In order to establish a pool for the key words, first a list of full articles with the word "statistical" in abstract is searched using R package "rplos", which contains functions that can be used for PLoS article searching and information download. By indicating "statistic" in abstract part, we can achieve result ``outide_id`` containing all the DOIs of all the full articles that we are interested in. 
 
 ```{r }
+out_id_all <- searchplos(q="materials_and_methods: statistics",
+                    fl="id", fq='doc_type: full', sort='publication_date desc')
+
 out_id <- searchplos(q="materials_and_methods: statistics",
-                     fl="id", fq='doc_type: full', sort='publication_date desc')
+                     fl="id", fq='doc_type: full', sort='publication_date desc', limit = 100)
+
+# Full text xml given a DOI
 out_fulltext <- plos_fulltext(doi=out_id$data$id[1])
-data <- xmlParse(out_fulltext$`10.1371/journal.ppat.1006607`)
+data <- xmlParse(out_fulltext[[1]])
 out_abstract <- xpathSApply(data, "//abstract", xmlValue)
+
+#for (i in 1:100) {
+#  out_fulltext <- plos_fulltext(doi=out_id$data$id[i])
+#  xpathSApply(xmlParse(out_fulltext[[1]]), "//abstract", xmlValue)
+#  out_abstract <- xpathSApply(data, "//abstract", xmlValue)
+#}
 
 text <- ft_get(out_id$data$id[1])
 text$plos$data
 ```
 
-Create a dictionary for common statistical methods and select paper with key words in "material and methods" part
+Create a decent pool for common statistical methods and select paper with key words in "material and methods" part.
 ```{r}
-pool <- c("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
-          "neural network", "support vector machine", "ridge regression")
+pool <- list("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
+          "neural network", "support vector machine", "ridge regression", "MCMC")
+pl <- c("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
+          "neural network", "support vector machine", "ridge regression", "MCMC")
+
+# Using keywords in the pool and return "material and methods"
 out_LR <- searchplos(q="materials_and_methods: linear regression",
                      fl=c("id","title","journal","publication_date"), 
                     fq='doc_type: full', sort='publication_date desc')
@@ -100,14 +119,45 @@ out_SVM <- searchplos(q="materials_and_methods: support vector machine",
 out_RR <- searchplos(q="materials_and_methods: ridge regression",
                      fl=c("id","title","journal","publication_date"), 
                     fq='doc_type: full', sort='publication_date desc')
+out_MCMC <- searchplos(q="materials_and_methods: MCMC",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+
 ```
 
-## Analysis
+
+## Data cleaning
+After downloading the "abstract"" and "materials and methods" from articles we are intereted in, we clean the data using R package "tidyr" and "tidytext", removing the stopwords and punctuations.
+
+
 ```{r}
+install.package("tidytext")
+library(tidytext)
 
-plosword(list('linear regression', 'bootstrap','ANOVA'), vis = TRUE)
+```
 
-plot_throughtime(terms = c('linear regression','bootstrap','ANOVA'), limit = 100)
 
+## Data Analysis
+
+1. Compare the frequency of statistical methods by counting the number of articles using the key words
+
+```{r}
+plosword(pool, vis = TRUE)
+```
+
+2. Observe the 
+```{r }
+plot_throughtime(terms = pl[1:3], limit = 100)
+plot_throughtime(terms = pl[4:6], limit = 100)
+plot_throughtime(terms = pl[7:9], limit = 100)
+
+```
+
+```{r }
 output <- highplos(q='linear regression', hl.fl = 'Materials and Methods')
 ```
+
+
+## Reference
+1. https://www.statisticallysignificantconsulting.com/Statistical-Tests.htm.
+
