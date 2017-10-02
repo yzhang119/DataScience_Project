@@ -66,6 +66,12 @@ library("XML")
 In order to establish a pool for the key words, first a list of full articles with the word "statistical" in abstract is searched using R package "rplos", which contains functions that can be used for PLoS article searching and information download. By indicating "statistic" in abstract part, we can achieve result ``outide_id`` containing all the DOIs of all the full articles that we are interested in. 
 
 ```{r }
+install.packages("tidytext",repos="http://cran.rstudio.com/")
+library(tidytext)
+library(dplyr)
+library(tidyr)
+library(stringr)
+
 out_id_all <- searchplos(q="materials_and_methods: statistics",
                     fl="id", fq='doc_type: full', sort='publication_date desc')
 
@@ -75,12 +81,21 @@ out_id <- searchplos(q="materials_and_methods: statistics",
 # Full text xml given a DOI
 out_fulltext <- plos_fulltext(doi=out_id$data$id[1])
 data <- xmlParse(out_fulltext[[1]])
-out_abstract <- xpathSApply(data, "//abstract", xmlValue)
+out_abstract_1 <- xpathSApply(data, "//abstract", xmlValue)
+tidy_abstract_1 <- out_abstract_1 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+
+out_fulltext <- plos_fulltext(doi=out_id$data$id[2])
+data <- xmlParse(out_fulltext[[1]])
+out_abstract_2 <- xpathSApply(data, "//abstract", xmlValue)
+tidy_abstract_2 <- out_abstract_2 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+
+tidy_abstract <- rbind(tidy_abstract_1,tidy_abstract_2)
 
 #for (i in 1:100) {
 #  out_fulltext <- plos_fulltext(doi=out_id$data$id[i])
 #  xpathSApply(xmlParse(out_fulltext[[1]]), "//abstract", xmlValue)
 #  out_abstract <- xpathSApply(data, "//abstract", xmlValue)
+#  out_abstract_full
 #}
 
 text <- ft_get(out_id$data$id[1])
@@ -131,13 +146,9 @@ After downloading the "abstract"" and "materials and methods" from articles we a
 
 
 ```{r}
-install.package("tidytext")
-library(tidytext)
-library(dplyr)
-library(tidyr)
-library(stringr)
 
-tidy_abstract <- out_abstract %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+
+# tidy_abstract <- out_abstract %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
   
 file_words <- tidy_abstract %>%
   unnest_tokens(word, x) %>%
