@@ -3,8 +3,8 @@ title: "Project Report"
 author: "Ye Zhang"
 date: "10/01/2017"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -84,22 +84,24 @@ data <- xmlParse(out_fulltext[[1]])
 out_abstract_1 <- xpathSApply(data, "//abstract", xmlValue)
 tidy_abstract_1 <- out_abstract_1 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
 
-out_fulltext <- plos_fulltext(doi=out_id$data$id[2])
-data <- xmlParse(out_fulltext[[1]])
-out_abstract_2 <- xpathSApply(data, "//abstract", xmlValue)
-tidy_abstract_2 <- out_abstract_2 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+#out_fulltext <- plos_fulltext(doi=out_id$data$id[2])
+#data <- xmlParse(out_fulltext[[1]])
+#out_abstract_2 <- xpathSApply(data, "//abstract", xmlValue)
+#tidy_abstract_2 <- out_abstract_2 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
 
-tidy_abstract <- rbind(tidy_abstract_1,tidy_abstract_2)
+# tidy_abstract <- rbind(tidy_abstract_1,tidy_abstract_2)
 
-#for (i in 1:100) {
-#  out_fulltext <- plos_fulltext(doi=out_id$data$id[i])
-#  xpathSApply(xmlParse(out_fulltext[[1]]), "//abstract", xmlValue)
-#  out_abstract <- xpathSApply(data, "//abstract", xmlValue)
-#  out_abstract_full
-#}
+tidy_abstract_all <- tidy_abstract_1
 
-text <- ft_get(out_id$data$id[1])
-text$plos$data
+for (i in 2:100) {
+  out_ft <- plos_fulltext(doi=out_id$data$id[i])
+  out_abs <- xpathSApply(xmlParse(out_ft[[1]]), "//abstract", xmlValue)
+  tidy_abs <- out_abs %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+  tidy_abstract_all <- rbind(tidy_abstract_all,tidy_abs)
+}
+
+#text <- ft_get(out_id$data$id[1])
+#text$plos$data
 ```
 
 Create a decent pool for common statistical methods and select paper with key words in "material and methods" part.
@@ -150,7 +152,7 @@ After downloading the "abstract"" and "materials and methods" from articles we a
 
 # tidy_abstract <- out_abstract %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
   
-file_words <- tidy_abstract %>%
+file_words <- tidy_abstract_all %>%
   unnest_tokens(word, x) %>%
   anti_join(stop_words) %>%
   group_by(word) %>%
