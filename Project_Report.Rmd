@@ -19,7 +19,7 @@ The Public Library of Science (PLoS) is a nonprofit open access science, technol
 * How do they vary by field? 
 * Are there any trends over the last 10-15 years?
 
-**Step 1**
+## Methods and Materials
 
 Data: the dataset for this project should include all the published [PLoS](https://www.plos.org) papers from its 7 journals, [PLoS one](http://journals.plos.org/plosone/), [PLoS Biology](http://journals.plos.org/plosbiology/), [PLoS Medicine](http://journals.plos.org/plosmedicine/), [PLoS Comutational Biology](http://journals.plos.org/ploscompbiol/), [PLoS Genetic](http://journals.plos.org/plosgenetics/), [PLoS Neglected Tropical Diseases](http://journals.plos.org/plosntds/) and [PLos Pathogens](http://journals.plos.org/plospathogens/). For each publication, there'are a list of information we need to download from the websites into our R program as the dataset:
 
@@ -30,16 +30,11 @@ Data: the dataset for this project should include all the published [PLoS](https
 * Date of publication
 * Materials and Methods part
 
-**Step 2**
+Usually the statistical analysis techique utilized in a publication is described in the *Materials and Methods* section of the article,thus we should focus on extracting all the types of data analyses techniques mentioned in the *Materials and Methods* section of all the publications. One possibe way is to look for certain key words, such as "Hypothesis testing", "t test", "linear regression", "log linear regression", et al. With this method, it is important to establish a decent pool of key words before extraction, and some refereneces summarizing the statistical analyses methods online could be helpful, such as https://www.statisticallysignificantconsulting.com/Statistical-Tests.htm.
 
-Types of analyses: Usually the statistical analysis techique utilized in a publication is described in the *Materials and Methods* section of the article,thus we should focus on extracting all the types of data analyses techniques mentioned in the *Materials and Methods* section of all the publications. One possibe way is to look for certain key words, such as "Hypothesis testing", "t test", "linear regression", "log linear regression", et al. With this method, it is important to establish a decent pool of key words before extraction, and some refereneces summarizing the statistical analyses methods online could be helpful, such as https://www.statisticallysignificantconsulting.com/Statistical-Tests.htm.
+After extracting all the key words from articles, we can then start to answer the three questions listed at the beginning. With the dataset established through **Step 1** and **2**, it's possible to figure out the most commonly utilized analyses techniques, and coorelation between these techniques and the fields (the PLoS journal) and publication years. Take the key word "t test" as an example, we can figure out how many times the "t test" is mentioned over the years as well as in articles among 7 different fields.
 
-
-**Step 3**
-
-Dataset Analysis: After extracting all the key words from articles, we can then start to answer the three questions listed at the beginning. With the dataset established through **Step 1** and **2**, it's possible to figure out the most commonly utilized analyses techniques, and coorelation between these techniques and the fields (the PLoS journal) and publication years. Take the key word "t test" as an example, we can figure out how many times the "t test" is mentioned over the years as well as in articles among 7 different fields.
-
-```{r echo=FALSE, results='hide'}
+```{r echo=FALSE, results='hide', warning=FALSE, Message=FALSE}
 install.packages("tm", repos="http://cran.rstudio.com/")
 library("tm")
 
@@ -61,9 +56,9 @@ library("fulltext")
 library("XML")
 ```
 
-## Data Preparation
+### Preliminary Data preparation
 
-In order to establish a pool for the key words, first a list of full articles with the word "statistical" in abstract is searched using R package "rplos", which contains functions that can be used for PLoS article searching and information download. By indicating "statistic" in abstract part, we can achieve result ``outide_id`` containing all the DOIs of all the full articles that we are interested in. 
+In order to establish a pool for the key words, first a list of full articles with the word "statistics" in "abstract" is searched using R package "rplos", which contains functions that can be used for PLoS article searching and information download. By indicating "statistic" in the "materials and methods" part, we can achieve result ``outide_id`` containing all the DOIs of all the full articles that we are interested in and then download  the abstracts of these articles. Here I download abstracts of 500 articles with the word "statistics" in their abstracts. After tidying up this preliminary download data, I unnest the tokens using ```word```, ```bigram (two words combination)``` and ```trigram (three words combination)``` respectively and calculated the frequency of these ```word```, ```bigram``` and ```trigram```. Then I can have a rough summary of the most frequent statistical methods mentioned in the 500 abstracts after going through these three data frames ordered with frequency.
 
 ```{r }
 install.packages("tidytext",repos="http://cran.rstudio.com/")
@@ -72,108 +67,263 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 
-out_id_all <- searchplos(q="materials_and_methods: statistics",
+# out_id_all <- searchplos(q="materials_and_methods: statistics",
+#                    fl="id", fq='doc_type: full', sort='publication_date desc')
+# out_id_all$meta
+
+
+out_id_all <- searchplos(q="abstract: statistics",
                     fl="id", fq='doc_type: full', sort='publication_date desc')
+out_id_all$meta
 
-out_id <- searchplos(q="materials_and_methods: statistics",
-                     fl="id", fq='doc_type: full', sort='publication_date desc', limit = 100)
+# out_id <- searchplos(q="materials_and_methods: statistics",
+#                     fl="id", fq='doc_type: full', sort='publication_date desc', limit = 500)
 
-# Full text xml given a DOI
+out_id <- searchplos(q="abstract: statistics",
+                     fl="id", fq='doc_type: full', sort='publication_date desc', limit = 500)
+
+# Abstract text xml given a DOI
 out_fulltext <- plos_fulltext(doi=out_id$data$id[1])
 data <- xmlParse(out_fulltext[[1]])
 out_abstract_1 <- xpathSApply(data, "//abstract", xmlValue)
-tidy_abstract_1 <- out_abstract_1 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
-
-#out_fulltext <- plos_fulltext(doi=out_id$data$id[2])
-#data <- xmlParse(out_fulltext[[1]])
-#out_abstract_2 <- xpathSApply(data, "//abstract", xmlValue)
-#tidy_abstract_2 <- out_abstract_2 %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
-
-# tidy_abstract <- rbind(tidy_abstract_1,tidy_abstract_2)
+tidy_abstract_1 <- out_abstract_1 %>% str_replace_all("[[:punct:]]", " ") %>%
+  str_replace_all("[[:digit:]]"," ") %>% tidy()
 
 tidy_abstract_all <- tidy_abstract_1
 
-for (i in 2:100) {
+for (i in 2:500) {
   out_ft <- plos_fulltext(doi=out_id$data$id[i])
   out_abs <- xpathSApply(xmlParse(out_ft[[1]]), "//abstract", xmlValue)
-  tidy_abs <- out_abs %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
+  tidy_abs <- out_abs %>% str_replace_all("[[:punct:]]", " ") %>% str_replace_all("[[:digit:]]"," ") %>% tidy()
   tidy_abstract_all <- rbind(tidy_abstract_all,tidy_abs)
 }
 
-#text <- ft_get(out_id$data$id[1])
-#text$plos$data
-```
-
-Create a decent pool for common statistical methods and select paper with key words in "material and methods" part.
-```{r}
-pool <- list("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
-          "neural network", "support vector machine", "ridge regression", "MCMC")
-pl <- c("linear regression", "bootstrap", "maximum likelihood", "ANOVA", "clustering",
-          "neural network", "support vector machine", "ridge regression", "MCMC")
-
-# Using keywords in the pool and return "material and methods"
-out_LR <- searchplos(q="materials_and_methods: linear regression",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_Boot <- searchplos(q="materials_and_methods: bootstrap",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_MaxL <- searchplos(q="materials_and_methods: maximum likelihood",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_ANOVA <- searchplos(q="materials_and_methods: ANOVA",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_Cluster <- searchplos(q="materials_and_methods: clustering",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_NN <- searchplos(q="materials_and_methods: neural network",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_SVM <- searchplos(q="materials_and_methods: support vector machine",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_RR <- searchplos(q="materials_and_methods: ridge regression",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-out_MCMC <- searchplos(q="materials_and_methods: MCMC",
-                     fl=c("id","title","journal","publication_date"), 
-                    fq='doc_type: full', sort='publication_date desc')
-
-```
-
-
-## Data cleaning
-After downloading the "abstract"" and "materials and methods" from articles we are intereted in, we clean the data using R package "tidyr" and "tidytext", removing the stopwords and punctuations.
-
-
-```{r}
-
-
-# tidy_abstract <- out_abstract %>% str_replace_all("[[:punct:]]", " ") %>% tidy()
-  
-file_words <- tidy_abstract_all %>%
+file_word <- tidy_abstract_all %>%
   unnest_tokens(word, x) %>%
   anti_join(stop_words) %>%
   group_by(word) %>%
   tally() %>%
   arrange(desc(n))
+
+file_bigram <- tidy_abstract_all %>% 
+  unnest_tokens(bigram, x, token="ngrams", n=2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  unite(bigram, word1, word2, sep = " ") %>%
+  count(bigram, sort=TRUE) %>%
+  arrange(desc(n))
+
+file_trigram <- tidy_abstract_all %>% 
+  unnest_tokens(trigram, x, token="ngrams", n=3) %>%
+  separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  filter(!word3 %in% stop_words$word) %>% 
+  unite(trigram, word1, word2, word3, sep = " ") %>%
+  count(trigram, sort=TRUE) %>%
+  arrange(desc(n))
+
+head(file_word)
+head(file_bigram, 10)
+head(file_trigram,10)
+
 ```
 
 
-## Data Analysis
+### Data download for analysis
+
+As stated above, create a decent pool for common statistical methods by looking for the most frequent ```word```, ```bigram``` and ```trigram``` in 500 abstracts. Then download publication information including DOI, title, publication journal, and publication date, with these key words in "material and methods" part.
+
+First, search for the number of publications with each key words in their "materials and methods".
+```{r}
+
+dic <- c("logistic regression", "meta analysis", "bootstrap", "ANOVA", "clustering", "bayesian", "t-test", 
+         "linear regression", "machine learning", "maximum likelihood", "neural network", "random forest",
+         "support vector machine", "MCMC")
+
+# Using keywords in the pool and return "material and methods"
+LogReg <- searchplos(q="materials_and_methods: logistic regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MetaAnal <- searchplos(q="materials_and_methods: meta analysis",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc') 
+Bootstrap <- searchplos(q="materials_and_methods: bootstrap",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+ANOVA <- searchplos(q="materials_and_methods: ANOVA",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+Cluster <- searchplos(q="materials_and_methods: clustering",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+Bayesian <- searchplos(q="materials_and_methods: bayesian",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+Ttest <- searchplos(q="materials_and_methods: t-test",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+LinReg <- searchplos(q="materials_and_methods: linear regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MachLrn <- searchplos(q="materials_and_methods: machine learning",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MaxL <- searchplos(q="materials_and_methods: maximum likelihood",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+NeuNet <- searchplos(q="materials_and_methods: neural network",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+RamFor <- searchplos(q="materials_and_methods: random forest",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+SVM <- searchplos(q="materials_and_methods: support vector machine",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MCMC <- searchplos(q="materials_and_methods: MCMC",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc')
+
+counts <- c(LogReg$meta$numFound, MetaAnal$meta$numFound, Bootstrap$meta$numFound, ANOVA$meta$numFound, 
+            Cluster$meta$numFound, Bayesian$meta$numFound, Ttest$meta$numFound, LinReg$meta$numFound, 
+            MachLrn$meta$numFound, MaxL$meta$numFound, NeuNet$meta$numFound, RamFor$meta$numFound, 
+            SVM$meta$numFound, MCMC$meta$numFound)
+df <- data.frame(methods = dic, counts = counts)
+
+```
+
+
+```{r eval=FALSE}
+LogReg_all <- searchplos(q="materials_and_methods: logistic regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=15920)
+MetaAnal_all <- searchplos(q="materials_and_methods: meta analysis",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=8350) 
+Bootstrap_all <- searchplos(q="materials_and_methods: bootstrap",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 10464)
+ANOVA_all <- searchplos(q="materials_and_methods: ANOVA",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 43599)
+Cluster_all <- searchplos(q="materials_and_methods: clustering",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 27202)
+Bayesian_all <- searchplos(q="materials_and_methods: bayesian",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc',limit = 7514)
+Ttest_all <- searchplos(q="materials_and_methods: t-test",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 42138)
+LinReg_all <- searchplos(q="materials_and_methods: linear regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 26222)
+MachLrn_all <- searchplos(q="materials_and_methods: machine learning",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 2605)
+MaxL_all <- searchplos(q="materials_and_methods: maximum likelihood",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 15709)
+NeuNet_all <- searchplos(q="materials_and_methods: neural network",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=2956)
+RamFor_all <- searchplos(q="materials_and_methods: random forest",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc',limit = 8916)
+SVM_all <- searchplos(q="materials_and_methods: support vector machine",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 2068)
+MCMC_all <- searchplos(q="materials_and_methods: MCMC",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit = 2800)
+
+#Data <- rbind(LogReg_all,MetaAnal_all)
+#write.csv(Data, "Data.csv")
+
+
+```
+
+
+### Data cleaning
+After downloading the "abstract"" and "materials and methods" from articles we are intereted in, we clean the data using R package "tidyr" and "tidytext", removing the stopwords and punctuations.
+
+
+```{r}
+
+```
+
+
+## Results and Discussion
 
 1. Compare the frequency of statistical methods by counting the number of articles using the key words
 
 ```{r}
-plosword(pool, vis = TRUE)
+library(ggplot2)
+
+# plosword(pool, vis = TRUE)
+
+ggplot(data=df, aes(x=reorder(methods,-counts), y=counts)) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=counts), hjust=-0.2, size=3.5) +
+  theme_minimal() +
+  xlab("Statistical Methods") +
+  ylab("Counts") +
+  coord_flip(ylim=c(0,50000))
 ```
 
-2. Observe the 
+2. Calcuate the frequency of each method in each PLOS journal. 
+
+```{r}
+library("stringr")
+JournalName <- c("PLOS ONE", "PLOS Biology", "PLOS Medicine", "PLOS Computational Biology", "PLOS Genetic",
+                 "PLOS Neglected Tropical Diseases", "PLOS Pathogens")
+Field <- c("General", "Biology", "Medicine", "Computayional Biology", "Genetics", "Neglected tropical diseases",
+           "Pathogen")
+
+J_Log <- sapply(JournalName, function (x) sum(str_count(LogReg_all$data$journal, x)))
+J_Meta <- sapply(JournalName, function (x) sum(str_count(MetaAnal_all$data$journal, x)))
+J_boot <- sapply(JournalName, function (x) sum(str_count(Bootstrap_all$data$journal, x)))
+J_ANOVA <- sapply(JournalName, function (x) sum(str_count(ANOVA_all$data$journal, x)))
+J_Cluster <- sapply(JournalName, function (x) sum(str_count(Cluster_all$data$journal, x)))
+J_Bayes <- sapply(JournalName, function (x) sum(str_count(Bayesian_all$data$journal, x)))
+J_ttest <- sapply(JournalName, function (x) sum(str_count(Ttest_all$data$journal, x)))
+J_Lin <- sapply(JournalName, function (x) sum(str_count(LinReg_all$data$journal, x)))
+J_Mach <- sapply(JournalName, function (x) sum(str_count(MachLrn_all$data$journal, x)))
+J_MaxL <- sapply(JournalName, function (x) sum(str_count(MaxL_all$data$journal, x)))
+J_Neu <- sapply(JournalName, function (x) sum(str_count(NeuNet_all$data$journal, x)))
+J_Ram <- sapply(JournalName, function (x) sum(str_count(RamFor_all$data$journal, x)))
+J_SVM <- sapply(JournalName, function (x) sum(str_count(SVM_all$data$journal, x)))
+J_MCMC <- sapply(JournalName, function (x) sum(str_count(MCMC_all$data$journal, x)))
+
+df_J <- data.frame(rbind(J_Log, J_Meta, J_boot, J_ANOVA, J_Cluster, J_Bayes, J_ttest, J_Lin, J_Mach, J_MaxL, J_Neu, J_Ram, J_SVM, J_MCMC))
+rownames(df_J) <- dic
+colnames(df_J) <- Field
+df <- cbind(df, df_J)
+
+install.packages("gridExtra")
+library(gridExtra)
+require(gridExtra)
+library(grid)
+require(grid)
+mytheme <- gridExtra::ttheme_default(
+  core = list(fg_params=list(cex = 0.5)),
+  colhead = list(fg_params=list(cex = 0.5)),
+  rowhead = list(fg_params=list(cex = 0.5)))
+tb <- gridExtra::tableGrob(df_J, theme = mytheme)
+grid.draw(tb)
+```
+
+3. Plot through time
+
 ```{r }
-plot_throughtime(terms = pl[1:3], limit = 100)
-plot_throughtime(terms = pl[4:6], limit = 100)
-plot_throughtime(terms = pl[7:9], limit = 100)
+pool <- list("logistic regression", "meta analysis", "bootstrap", "ANOVA", "clustering", "bayesian", "t-test", 
+         "linear regression", "machine learning", "maximum likelihood", "neural network", "random forest",
+         "support vector machine", "MCMC")
+plot_throughtime(terms = pool[1:5], limit = 100)
+plot_throughtime(terms = pl[6:10], limit = 100)
+plot_throughtime(terms = pl[11:14], limit = 100)
 
 ```
 
