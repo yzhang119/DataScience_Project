@@ -1,0 +1,405 @@
+---
+title: "Final Code"
+author: "Ye Zhang"
+date: "Biomedical Engineering Department, Johns Hopkins University, Baltimore, MD 21218"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Part I - R package installation
+
+```{r echo=FALSE, include=FALSE, cache=FALSE}
+# install packages
+packages<-c("devtools","fulltext","tidytext","knitr","XML","plyr","dplyr","tidyr","stringr","ggplot2","scales")
+
+for (i in packages){
+  if(!require(i,character.only = T,quietly=T,warn.conflicts = F)){
+    install.packages(i, repos = "http://cran.us.r-project.org")
+  }
+  require(i,character.only = T,quietly=T,warn.conflicts = F)
+}
+
+if (!require("rplos")) {
+  devtools::install_github("ropensci/rplos")
+  library("rplos")
+}
+
+if(!require("kableExtra")) {
+  devtools::install_github("haozhu233/kableExtra")
+  library(kableExtra)
+}
+
+library(knitr)
+library(XML)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(scales)
+```
+
+### Part II - Preliminary Exploration
+
+Download abstracts of 500 *PLoS* articles with the text term "statistics" and save as "abs500.RData" after tidying up. This dataset is used to establish a pool of "Key words" associated with statistical methods.
+
+```{r echo=FALSE, eval=FALSE}
+require(rplos)
+require(fulltext)
+require(XML)
+require(tidytext)
+require(dplyr)
+require(tidyr)
+require(stringr)
+
+out_id_all <- searchplos(q="abstract: statistics",
+                    fl="id", fq='doc_type: full', sort='publication_date desc')
+out_id_all$meta
+
+out_id <- searchplos(q="abstract: statistics",
+                     fl="id", fq='doc_type: full', limit = 500)
+
+# Abstract text xml given a DOI
+out_fulltext <- plos_fulltext(doi=out_id$data$id[1])
+data <- xmlParse(out_fulltext[[1]])
+out_abstract_1 <- xpathSApply(data, "//abstract", xmlValue)
+tidy_abstract_1 <- out_abstract_1 %>% str_replace_all("[[:punct:]]", " ") %>%
+  str_replace_all("[[:digit:]]"," ") %>% tidy()
+
+tidy_abstract_all <- tidy_abstract_1
+
+for (i in 2:500) {
+  out_ft <- plos_fulltext(doi=out_id$data$id[i])
+  out_abs <- xpathSApply(xmlParse(out_ft[[1]]), "//abstract", xmlValue)
+  tidy_abs <- out_abs %>% str_replace_all("[[:punct:]]", " ") %>% str_replace_all("[[:digit:]]"," ") %>% tidy()
+  tidy_abstract_all <- rbind(tidy_abstract_all,tidy_abs)
+}
+
+save(tidy_abstract_all, file="abs500.RData")
+```
+
+### Part III - Plot the table for key words
+
+Load data "abs500.RData" and summarize a table of 14 statistical methods that are most frequently mentioned in these 500 randomly picked abstracts.
+
+```{r echo=FALSE, message=FALSE}
+require(tidytext)
+require(dplyr)
+require(tidyr)
+require(stringr)
+require(knitr)
+require(kableExtra)
+
+load(file.path("data", "abs500.RData"))
+
+file_word <- tidy_abstract_all %>%
+  unnest_tokens(word, x) %>%
+  anti_join(stop_words) %>%
+  group_by(word) %>%
+  tally() %>%
+  arrange(desc(n))
+
+file_bigram <- tidy_abstract_all %>% 
+  unnest_tokens(bigram, x, token="ngrams", n=2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  unite(bigram, word1, word2, sep = " ") %>%
+  count(bigram, sort=TRUE) %>%
+  arrange(desc(n))
+
+file_trigram <- tidy_abstract_all %>% 
+  unnest_tokens(trigram, x, token="ngrams", n=3) %>%
+  separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  filter(!word3 %in% stop_words$word) %>% 
+  unite(trigram, word1, word2, word3, sep = " ") %>%
+  count(trigram, sort=TRUE) %>%
+  arrange(desc(n))
+
+## Plot a table of key words
+c1 <- c("1.", "2.", "3.","4.", "5.", "6.","7.")
+c2 <- c("8.", "9.", "10.","11.", "12.", "13.","14.")
+pool <- data.frame(cbind(c1, c("logistic regression", "meta analysis", "bootstrap", "ANOVA", "clustering", "bayesian", "t-test"), c2, c("linear regression", "machine learning", "maximum likelihood", "neural network", "random forest", "support vector machine", "MCMC")))
+colnames(pool) <- c("","methods", "","methods")
+kable(pool, caption = "Key words of statistical analysis methods", row.names = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"), position = "center")
+```
+
+### Part IV - Data Collection
+
+Use R package ```rplos``` to look for exact matches to "key words" listed in **Table 1** in "materials and methods" of all the *PLoS* full articles. For each article with the appearance of key word, information including the article title, DOI, the *PLoS* journal it belongs to and the date of publication was downloaded and saved as my dataset consisting of 14 large lists. Each list corresponded to one statistical method and included all the information of articles that mentioned this method in their "materials and methods" section. The dataset was saved as "data.RData" for subsequent analysis.
+
+```{r echo=FALSE, eval=FALSE}
+## Data collection
+# Using keywords in "material and methods" and return id and number of articles
+LogReg <- searchplos(q="materials_and_methods: logistic regression",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MetaAnal <- searchplos(q="materials_and_methods: meta analysis",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc') 
+Bootstrap <- searchplos(q="materials_and_methods: bootstrap",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+ANOVA <- searchplos(q="materials_and_methods: ANOVA",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+Cluster <- searchplos(q="materials_and_methods: clustering",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+Bayesian <- searchplos(q="materials_and_methods: bayesian",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+Ttest <- searchplos(q="materials_and_methods: t-test",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+LinReg <- searchplos(q="materials_and_methods: linear regression",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MachLrn <- searchplos(q="materials_and_methods: machine learning",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MaxL <- searchplos(q="materials_and_methods: maximum likelihood",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+NeuNet <- searchplos(q="materials_and_methods: neural network",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+RamFor <- searchplos(q="materials_and_methods: random forest",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+SVM <- searchplos(q="materials_and_methods: support vector machine",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+MCMC <- searchplos(q="materials_and_methods: MCMC",
+                     fl=c("id"), 
+                    fq='doc_type: full', sort='publication_date desc')
+
+counts <- c(LogReg$meta$numFound, MetaAnal$meta$numFound, Bootstrap$meta$numFound, ANOVA$meta$numFound, 
+            Cluster$meta$numFound, Bayesian$meta$numFound, Ttest$meta$numFound, LinReg$meta$numFound, 
+            MachLrn$meta$numFound, MaxL$meta$numFound, NeuNet$meta$numFound, RamFor$meta$numFound, 
+            SVM$meta$numFound, MCMC$meta$numFound)
+
+# Download DOI, title, journal and publication data
+LogReg_all <- searchplos(q="materials_and_methods: logistic regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[1])
+MetaAnal_all <- searchplos(q="materials_and_methods: meta analysis",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[2]) 
+Bootstrap_all <- searchplos(q="materials_and_methods: bootstrap",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[3])
+ANOVA_all <- searchplos(q="materials_and_methods: ANOVA",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[4])
+Cluster_all <- searchplos(q="materials_and_methods: clustering",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[5])
+Bayesian_all <- searchplos(q="materials_and_methods: bayesian",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc',limit=counts[6])
+Ttest_all <- searchplos(q="materials_and_methods: t-test",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[7])
+LinReg_all <- searchplos(q="materials_and_methods: linear regression",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[8])
+MachLrn_all <- searchplos(q="materials_and_methods: machine learning",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[9])
+MaxL_all <- searchplos(q="materials_and_methods: maximum likelihood",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[10])
+NeuNet_all <- searchplos(q="materials_and_methods: neural network",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[11])
+RamFor_all <- searchplos(q="materials_and_methods: random forest",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc',limit=counts[12])
+SVM_all <- searchplos(q="materials_and_methods: support vector machine",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[13])
+MCMC_all <- searchplos(q="materials_and_methods: MCMC",
+                     fl=c("id","title","journal","publication_date"), 
+                    fq='doc_type: full', sort='publication_date desc', limit=counts[14])
+save(LogReg_all, MetaAnal_all, Bootstrap_all, ANOVA_all, Cluster_all, Bayesian_all, Ttest_all, LinReg_all, MachLrn_all, MaxL_all, NeuNet_all, RamFor_all, SVM_all, MCMC_all, file = "data.RData")
+```
+
+### Part V - Plot Figure 1
+
+Load "data.RData" and plot Figure 1: a barplot of the number of *PLoS* articles reporting each statistical analysis methods.
+
+```{r echo=FALSE, message=FALSE}
+require(ggplot2)
+
+load(file.path("data","data.RData"))
+
+dic <- c("logistic regression", "meta analysis", "bootstrap", "ANOVA", "clustering", "bayesian", "t-test", "linear regression", "machine learning", "maximum likelihood", "neural network", "random forest","support vector machine", "MCMC")
+counts <- c(LogReg_all$meta$numFound, MetaAnal_all$meta$numFound, Bootstrap_all$meta$numFound, ANOVA_all$meta$numFound, Cluster_all$meta$numFound, Bayesian_all$meta$numFound, Ttest_all$meta$numFound, LinReg_all$meta$numFound, MachLrn_all$meta$numFound, MaxL_all$meta$numFound, NeuNet_all$meta$numFound, RamFor_all$meta$numFound, SVM_all$meta$numFound, MCMC_all$meta$numFound)
+df <- data.frame(methods = dic, counts = counts)
+
+ggplot(data=df, aes(x=reorder(methods,-counts), y=counts)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  xlab("Statistical Methods") +
+  ylab("Counts") +
+  scale_y_continuous(expand=c(0,0))+
+  coord_flip(ylim=c(0,45000))
+```
+
+**Figure 1.** A barplot of the number of *PLoS* articles reporting each statistical analysis methods. ANOVA and t-test are the top two popular statistical analyses methods each having been used in over 40,000 articles. Clustering and linear regression methods are the second tier with 27202 and 26222 articles respectively. Though less frequently mentioned, logistic regression, maximum likelihood and bootstrap methods still have been reported in over 10,000 articles. SVM and machine learning are reported in the smallest number of articles.
+
+
+### Part VI - Plot Figure 2
+
+```{r echo=FALSE}
+require("stringr")
+JournalName <- c("PLOS ONE", "PLOS Biology", "PLOS Medicine", "PLOS Computational Biology", "PLOS Genetic", "PLOS Neglected Tropical Diseases", "PLOS Pathogens")
+Field <- c("General", "Biology", "Medicine", "Computational Biology", "Genetics", "Neglected tropical diseases", "Pathogen")
+
+J_Log <- sapply(JournalName, function (x) sum(str_count(LogReg_all$data$journal, x)))
+J_Meta <- sapply(JournalName, function (x) sum(str_count(MetaAnal_all$data$journal, x)))
+J_boot <- sapply(JournalName, function (x) sum(str_count(Bootstrap_all$data$journal, x)))
+J_ANOVA <- sapply(JournalName, function (x) sum(str_count(ANOVA_all$data$journal, x)))
+J_Cluster <- sapply(JournalName, function (x) sum(str_count(Cluster_all$data$journal, x)))
+J_Bayes <- sapply(JournalName, function (x) sum(str_count(Bayesian_all$data$journal, x)))
+J_ttest <- sapply(JournalName, function (x) sum(str_count(Ttest_all$data$journal, x)))
+J_Lin <- sapply(JournalName, function (x) sum(str_count(LinReg_all$data$journal, x)))
+J_Mach <- sapply(JournalName, function (x) sum(str_count(MachLrn_all$data$journal, x)))
+J_MaxL <- sapply(JournalName, function (x) sum(str_count(MaxL_all$data$journal, x)))
+J_Neu <- sapply(JournalName, function (x) sum(str_count(NeuNet_all$data$journal, x)))
+J_Ram <- sapply(JournalName, function (x) sum(str_count(RamFor_all$data$journal, x)))
+J_SVM <- sapply(JournalName, function (x) sum(str_count(SVM_all$data$journal, x)))
+J_MCMC <- sapply(JournalName, function (x) sum(str_count(MCMC_all$data$journal, x)))
+
+
+df_J <- data.frame(rbind(J_Log, J_Meta, J_boot, J_ANOVA, J_Cluster, J_Bayes, J_ttest, J_Lin, J_Mach, J_MaxL, J_Neu, J_Ram, J_SVM, J_MCMC))
+df_J <- cbind(dic, data.frame(df_J, row.names = NULL))
+colnames(df_J) <- c("methods", Field)
+```
+
+```{r echo=FALSE, fig.width=9,fig.height=9}
+# Remove general column "PLoS ONE"
+require(tidyr)
+require(plyr)
+require(dplyr)
+require(scales)
+
+df_J_sub <- select(df_J, -General)
+dic_J <- c("logistic regression", "meta analysis", "bootstrap", "ANOVA", "clustering", "bayesian", "t-test", "linear regression", "machine learning", "maximum likelihood", "neural network", "random forest", "SVM", "MCMC")
+df_J_sub$methods <- dic_J
+df_J_sub_g <- gather(df_J_sub, Field, counts, -methods)
+df_J_sub_g <- ddply(df_J_sub_g, "methods", mutate, percent=counts/sum(counts)*100)
+df_J_sub_g <- ddply(df_J_sub_g, "methods", transform, pos=cumsum(percent)-0.5*percent)
+
+require(ggplot2)
+
+ggplot(data=df_J_sub_g, aes(x=methods, y=percent, fill=Field)) + 
+  geom_bar(position = position_stack(), stat = "identity", width = 0.7) +
+  geom_text(aes(label = paste0(sprintf("%.0f", percent), "%")), position = position_stack(vjust=0.5), size=3) +
+  xlab("Statistical Methods") +
+  ylab("Percentage") +
+  scale_y_continuous(labels=dollar_format(suffix="%", prefix=""), expand=c(0, 0), limits=c(-0.5, 101)) +
+  theme(axis.text.y   = element_text(size=10),
+        axis.text.x   = element_text(angle=60, hjust=1),
+        axis.title.y  = element_text(size=14),
+        axis.title.x  = element_text(size=14),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank(), 
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 1, colour = "black")) +
+     scale_fill_brewer(palette="Set3")
+```
+**Figure 2.** A distribution of statistical analysis methods in each field. ANOVA and t-test are most popular in Pathogen. T-test and meta analysis have also been frequently reported in the field of genetics. Logistic regression is obviously preferred in the field of neglected tropical diseases (52%). Computational Biology is the field where neural network (77%), SVM (51%) and machine learning (50%) are most frequently reported. There's no article in medicine field using neural network method. 
+
+### Part VII - Plot Figure 3
+
+```{r echo=FALSE}
+pool <- list("logistic regression", "meta analysis", "bootstrap", "ANOVA", "clustering", "bayesian", "t-test", "linear regression", "machine learning", "maximum likelihood", "neural network", "random forest","support vector machine", "MCMC")
+
+years <- c("2005","2006","2007","2008","2009","2010","2011","2012","2013","2014","2015","2016","2017")
+Y_Log <- sapply(years, function (x) sum(str_count(LogReg_all$data$publication_date, x)))
+Y_Meta <- sapply(years, function (x) sum(str_count(MetaAnal_all$data$publication_date, x)))
+Y_boot <- sapply(years, function (x) sum(str_count(Bootstrap_all$data$publication_date, x)))
+Y_ANOVA <- sapply(years, function (x) sum(str_count(ANOVA_all$data$publication_date, x)))
+Y_Cluster <- sapply(years, function (x) sum(str_count(Cluster_all$data$publication_date, x)))
+Y_Bayes <- sapply(years, function (x) sum(str_count(Bayesian_all$data$publication_date, x)))
+Y_ttest <- sapply(years, function (x) sum(str_count(Ttest_all$data$publication_date, x)))
+Y_Lin <- sapply(years, function (x) sum(str_count(LinReg_all$data$publication_date, x)))
+Y_Mach <- sapply(years, function (x) sum(str_count(MachLrn_all$data$publication_date, x)))
+Y_MaxL <- sapply(years, function (x) sum(str_count(MaxL_all$data$publication_date, x)))
+Y_Neu <- sapply(years, function (x) sum(str_count(NeuNet_all$data$publication_date, x)))
+Y_Ram <- sapply(years, function (x) sum(str_count(RamFor_all$data$publication_date, x)))
+Y_SVM <- sapply(years, function (x) sum(str_count(SVM_all$data$publication_date, x)))
+Y_MCMC <- sapply(years, function (x) sum(str_count(MCMC_all$data$publication_date, x)))
+
+df_Y <- data.frame(rbind(Y_Log, Y_Meta, Y_boot, Y_ANOVA, Y_Cluster, Y_Bayes, Y_ttest, Y_Lin, Y_Mach, Y_MaxL, Y_Neu, Y_Ram, Y_SVM, Y_MCMC))
+df_Y <- cbind(dic, data.frame(df_Y, row.names = NULL))
+colnames(df_Y) <- c("methods", years)
+```
+
+```{r echo=FALSE, fig.width=9, fig.height=10}
+require(tidyr)
+df_YY <- gather(df_Y, years, counts, -methods)
+
+require(ggplot2)
+
+ggplot(data=df_YY, aes(x=years, y=counts, group=1)) +
+  geom_point() + 
+  geom_line() +
+  facet_wrap(~methods, ncol = 3, scales = "free_y") +
+  xlab("Years") +
+  ylab("Counts") +
+  theme(axis.text.x   = element_text(angle=60, hjust=1),
+        axis.title.y  = element_text(size=14),
+        axis.title.x  = element_text(size=14))
+```
+**Figure 3.** An illustration of trends of statistical analysis methods application between 2005 and 2017. Their usage counts keep increasing since 2005 and reach the top in 2013. The increasing accelarates during 2010 to 2013, while it starts to drop down slowly after reaching the top.
+
+
+### Part VIII - Plot supplementary tables
+
+```{r echo=FALSE, message=FALSE}
+# Tables in supplementary material
+kable(head(file_word, 20), caption = "Top 20 single word in sample abstracts") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"), position = "center")
+
+kable(head(file_bigram, 20), caption = "Top 20 bigram in sample abstracts") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"), position = "center")
+
+kable(head(file_trigram, 20), caption = "Top 20 trigram in sample abstracts") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"), position = "center")
+```
+
+```{r echo=FALSE, message=FALSE}
+kable(df_J, format='latex', caption="Number of articles reporting statistical methods in each field", booktabs=T) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width =T,position = "center")
+```
+
+### Part IX - References
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+## Reference
+citation("rplos")
+citation("fulltext")
+citation("XML")
+citation("dplyr")
+citation("tidyr")
+citation("tidytext")
+citation("stringr")
+citation()
+citation("knitr")
+citation("kableExtra")
+citation("plyr")
+citation("ggplot2")
+citation("scales")
+citation("devtools")
+```
