@@ -1,0 +1,5 @@
+This directory contains 
+1. final report: final_writeup.pdf
+2. supplementary information: final_suppl.pdf
+3. all the code to reproduce data, tables, figures in final report and supplementary information: final_code.Rmd
+4. data directory: containing two datasets to reproduce the results: abs500.RData & data.RData
